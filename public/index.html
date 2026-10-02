@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProApps Store</title>
+    <title>ProApps Store - Premium Apps</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>.slide-image { transition: opacity 0.7s ease-in-out; }</style>
@@ -55,21 +55,32 @@
         <div id="noApps" class="hidden text-center py-16 text-gray-400"><p class="text-xl">কোনো অ্যাপস পাওয়া যায়নি!</p></div>
     </main>
 
-    <!-- Fullscreen Ads Modal -->
-    <div id="fullScreenAdsModal" class="fixed inset-0 bg-gray-950/95 z-50 flex flex-col justify-between hidden">
+    <!-- STEP 1: FULLSCREEN VIDEO AD MODAL -->
+    <div id="fullScreenVideoAdsModal" class="fixed inset-0 bg-black/95 z-50 flex flex-col justify-between hidden">
         <div class="p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center z-10">
-            <span class="text-xs text-amber-400 font-semibold uppercase flex items-center"><i class="fa-solid fa-rectangle-ad mr-2"></i> Adsterra Sponsored Ad</span>
+            <span class="text-xs text-amber-400 font-semibold uppercase flex items-center">
+                <i class="fa-solid fa-circle-play mr-2 text-red-500"></i> Adsterra Video Sponsored Ad
+            </span>
             <div>
-                <span id="adTimerBadge" class="bg-gray-800 text-emerald-400 font-bold px-3 py-1.5 rounded-lg border border-gray-700 text-xs">Skip in <span id="adCountdown">15</span>s</span>
-                <button id="skipAdBtn" onclick="closeAdAndOpenDownloadPopup()" class="hidden bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold px-4 py-1.5 rounded-lg text-xs shadow-lg">Skip Ad & Continue <i class="fa-solid fa-forward ml-1"></i></button>
+                <span id="adTimerBadge" class="bg-gray-800 text-emerald-400 font-bold px-3 py-1.5 rounded-lg border border-gray-700 text-xs">
+                    Skip in <span id="adCountdown">15</span>s
+                </span>
+                <button id="skipAdBtn" onclick="closeVideoAdAndOpenDownloadPopup()" class="hidden bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold px-4 py-1.5 rounded-lg text-xs shadow-lg">
+                    Skip Ad & Continue <i class="fa-solid fa-forward ml-1"></i>
+                </button>
             </div>
         </div>
-        <div id="fullAdDisplayBox" class="flex-grow w-full flex flex-col items-center justify-center p-4">
-            <div id="adDirectCodeBox" class="w-full flex justify-center"></div>
+
+        <!-- Video Ad Player Container -->
+        <div class="flex-grow w-full flex flex-col items-center justify-center p-2 relative overflow-hidden">
+            <div id="adVideoContainer" class="w-full max-w-3xl aspect-video bg-black rounded-2xl flex items-center justify-center relative overflow-hidden border border-gray-800 shadow-2xl">
+                <!-- Video Ads Script Container -->
+                <div id="videoScriptHolder" class="w-full h-full flex items-center justify-center"></div>
+            </div>
         </div>
     </div>
 
-    <!-- Download Modal -->
+    <!-- STEP 2: DOWNLOAD POPUP MODAL -->
     <div id="downloadModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-gray-800 rounded-2xl border border-gray-700 max-w-md w-full p-6 text-center relative max-h-[90vh] overflow-y-auto">
             <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl z-10"><i class="fa-solid fa-xmark"></i></button>
@@ -117,7 +128,7 @@
         function listenFirebaseData() {
             db.ref('apps').on('value', s => { allApps = s.val() ? Object.keys(s.val()).map(k => ({ id: k, ...s.val()[k] })) : []; renderApps(allApps); });
             db.ref('banners').on('value', s => { allBanners = s.val() ? Object.values(s.val()) : []; initSlider(); });
-            db.ref('ads_script').on('value', s => { savedAdsScript = s.val() || ""; injectAdScript(savedAdsScript); });
+            db.ref('ads_script').on('value', s => { savedAdsScript = s.val() || ""; });
             db.ref('social_bar_script').on('value', s => { socialBarScript = s.val() || ""; injectAdScript(socialBarScript); });
             db.ref('ad_duration').on('value', s => { adDuration = parseInt(s.val()) || 15; });
         }
@@ -185,16 +196,21 @@
             });
         }
 
+        // Trigger Video Ad When Clicking Download
         function onDownloadClick(appJson) {
             selectedApp = JSON.parse(decodeURIComponent(appJson));
+
             if (savedAdsScript && savedAdsScript.trim() !== "") {
-                const box = document.getElementById('adDirectCodeBox');
-                box.innerHTML = '';
-                box.appendChild(document.createRange().createContextualFragment(savedAdsScript));
+                const holder = document.getElementById('videoScriptHolder');
+                holder.innerHTML = '';
+                
+                // Inject Adsterra Video Script Code Directly
+                const fragment = document.createRange().createContextualFragment(savedAdsScript);
+                holder.appendChild(fragment);
 
                 document.getElementById('adTimerBadge').classList.remove('hidden');
                 document.getElementById('skipAdBtn').classList.add('hidden');
-                document.getElementById('fullScreenAdsModal').classList.remove('hidden');
+                document.getElementById('fullScreenVideoAdsModal').classList.remove('hidden');
 
                 let timeLeft = adDuration;
                 document.getElementById('adCountdown').innerText = timeLeft;
@@ -214,9 +230,11 @@
             }
         }
 
-        function closeAdAndOpenDownloadPopup() {
+        function closeVideoAdAndOpenDownloadPopup() {
             clearInterval(adTimer);
-            document.getElementById('fullScreenAdsModal').classList.add('hidden');
+            document.getElementById('fullScreenVideoAdsModal').classList.add('hidden');
+            // Clear Video Script
+            document.getElementById('videoScriptHolder').innerHTML = '';
             showDownloadPopup();
         }
 
@@ -252,5 +270,4 @@
         document.addEventListener('DOMContentLoaded', listenFirebaseData);
     </script>
 </body>
-  </html>
-  
+</html>
