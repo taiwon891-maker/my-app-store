@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProApps Store</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>.slide-image { transition: opacity 0.7s ease-in-out; }</style>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen flex flex-col">
+
+    <div id="globalAdInject"></div>
+
+    <!-- Header -->
+    <nav class="bg-gray-800 border-b border-gray-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="window.location.reload()">
+                <i class="fa-solid fa-store text-3xl text-emerald-400"></i>
+                <h1 class="text-2xl font-extrabold text-white">ProApps<span class="text-emerald-400">Store</span></h1>
+            </div>
+            <div class="relative w-full sm:w-72">
+                <input type="text" id="searchInput" onkeyup="searchApps()" placeholder="অ্যাপস সার্চ করুন..." 
+                    class="w-full bg-gray-700 text-white pl-10 pr-4 py-2 rounded-lg border border-gray-600 focus:outline-none focus:border-emerald-400">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-400"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Slider -->
+    <section class="max-w-7xl mx-auto px-4 pt-6 w-full">
+        <div class="relative w-full h-52 sm:h-80 md:h-96 rounded-2xl overflow-hidden border border-gray-700 bg-gray-800 group">
+            <div id="sliderContainer" class="w-full h-full relative"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-gray-950 via-gray-950/40 to-transparent flex flex-col justify-end p-6 pointer-events-none">
+                <h2 class="text-2xl sm:text-4xl font-extrabold text-white">সেরা প্রিমিয়াম ও মোড অ্যাপস</h2>
+                <p class="text-emerald-300 text-xs sm:text-base mt-1">১০০% নিরাপদ এবং দ্রুত ডাউনলোড।</p>
+            </div>
+            <button onclick="prevSlide()" class="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 text-white p-3 rounded-full opacity-0 group-hover:opacity-100"><i class="fa-solid fa-chevron-left"></i></button>
+            <button onclick="nextSlide()" class="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 text-white p-3 rounded-full opacity-0 group-hover:opacity-100"><i class="fa-solid fa-chevron-right"></i></button>
+            <div id="sliderDots" class="absolute bottom-3 right-6 flex space-x-2 z-10"></div>
+        </div>
+    </section>
+
+    <!-- Apps Area -->
+    <main class="max-w-7xl mx-auto px-4 py-10 flex-grow w-full">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold border-l-4 border-emerald-400 pl-3">উপলব্ধ অ্যাপসমূহ</h3>
+            <span id="appCount" class="bg-emerald-500/20 text-emerald-300 text-sm px-3 py-1 rounded-full">0 টি অ্যাপস</span>
+        </div>
+        <div id="appGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+        <div id="noApps" class="hidden text-center py-16 text-gray-400"><p class="text-xl">কোনো অ্যাপস পাওয়া যায়নি!</p></div>
+    </main>
+
+    <!-- Fullscreen Ads Modal -->
+    <div id="fullScreenAdsModal" class="fixed inset-0 bg-gray-950/95 z-50 flex flex-col justify-between hidden">
+        <div class="p-4 bg-gray-900 border-b border-gray-800 flex justify-between items-center z-10">
+            <span class="text-xs text-amber-400 font-semibold uppercase flex items-center"><i class="fa-solid fa-rectangle-ad mr-2"></i> Adsterra Sponsored Ad</span>
+            <div>
+                <span id="adTimerBadge" class="bg-gray-800 text-emerald-400 font-bold px-3 py-1.5 rounded-lg border border-gray-700 text-xs">Skip in <span id="adCountdown">15</span>s</span>
+                <button id="skipAdBtn" onclick="closeAdAndOpenDownloadPopup()" class="hidden bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold px-4 py-1.5 rounded-lg text-xs shadow-lg">Skip Ad & Continue <i class="fa-solid fa-forward ml-1"></i></button>
+            </div>
+        </div>
+        <div id="fullAdDisplayBox" class="flex-grow w-full flex flex-col items-center justify-center p-4">
+            <div id="adDirectCodeBox" class="w-full flex justify-center"></div>
+        </div>
+    </div>
+
+    <!-- Download Modal -->
+    <div id="downloadModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-800 rounded-2xl border border-gray-700 max-w-md w-full p-6 text-center relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal()" class="absolute top-4 right-4 text-gray-400 hover:text-white text-xl z-10"><i class="fa-solid fa-xmark"></i></button>
+
+            <div class="flex items-center space-x-4 text-left border-b border-gray-700 pb-4 mb-4">
+                <img id="modalIcon" src="" class="w-16 h-16 rounded-2xl object-cover bg-gray-700">
+                <div class="overflow-hidden">
+                    <h3 id="modalTitle" class="font-bold text-lg text-white truncate"></h3>
+                    <p id="modalCategory" class="text-emerald-400 text-xs font-semibold mt-0.5"></p>
+                    <div class="flex items-center space-x-3 text-xs text-gray-400 mt-1">
+                        <span id="modalVersion"></span>
+                        <span id="modalSize"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="py-2">
+                <p class="text-emerald-300 font-semibold text-sm mb-3">আপনার ফাইল ডাউনলোডের জন্য প্রস্তুত!</p>
+                <a id="manualDownloadBtn" href="" download class="inline-flex items-center space-x-2 bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold px-6 py-3 rounded-xl transition w-full justify-center">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Direct APK Download</span>
+                </a>
+            </div>
+
+            <div id="socialBarAdsBox" class="my-4 p-2 bg-gray-900 rounded-xl border border-gray-700 min-h-[80px]"></div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAuq8zWctapBzAK28b8Rng-iOWLhqEhUZw",
+            authDomain: "apps-store-5fb1f.firebaseapp.com",
+            databaseURL: "https://apps-store-5fb1f-default-rtdb.firebaseio.com",
+            projectId: "apps-store-5fb1f",
+            storageBucket: "apps-store-5fb1f.firebasestorage.app",
+            messagingSenderId: "474834055005",
+            appId: "1:474834055005:web:4392e4fc6f13e9e4f782b4"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let allApps = [], allBanners = [], savedAdsScript = "", socialBarScript = "", adDuration = 15, selectedApp = null, adTimer = null, currentSlide = 0, slideInterval = null;
+
+        function listenFirebaseData() {
+            db.ref('apps').on('value', s => { allApps = s.val() ? Object.keys(s.val()).map(k => ({ id: k, ...s.val()[k] })) : []; renderApps(allApps); });
+            db.ref('banners').on('value', s => { allBanners = s.val() ? Object.values(s.val()) : []; initSlider(); });
+            db.ref('ads_script').on('value', s => { savedAdsScript = s.val() || ""; injectAdScript(savedAdsScript); });
+            db.ref('social_bar_script').on('value', s => { socialBarScript = s.val() || ""; injectAdScript(socialBarScript); });
+            db.ref('ad_duration').on('value', s => { adDuration = parseInt(s.val()) || 15; });
+        }
+
+        function injectAdScript(code) {
+            if (!code) return;
+            const fragment = document.createRange().createContextualFragment(code);
+            document.getElementById('globalAdInject').appendChild(fragment);
+        }
+
+        function initSlider() {
+            const container = document.getElementById('sliderContainer'), dots = document.getElementById('sliderDots');
+            if (allBanners.length === 0) return;
+
+            container.innerHTML = allBanners.map((img, i) => `<img src="${img}" class="slide-image absolute inset-0 w-full h-full object-cover ${i === 0 ? 'opacity-100' : 'opacity-0'}" id="slide-${i}">`).join('');
+            dots.innerHTML = allBanners.map((_, i) => `<button onclick="goToSlide(${i})" class="w-3 h-3 rounded-full ${i === 0 ? 'bg-emerald-400' : 'bg-gray-500/60'}" id="dot-${i}"></button>`).join('');
+            startAutoSlide();
+        }
+
+        function showSlide(index) {
+            if (allBanners.length === 0) return;
+            currentSlide = index >= allBanners.length ? 0 : (index < 0 ? allBanners.length - 1 : index);
+            allBanners.forEach((_, i) => {
+                const img = document.getElementById(`slide-${i}`), dot = document.getElementById(`dot-${i}`);
+                if (img) img.className = `slide-image absolute inset-0 w-full h-full object-cover ${i === currentSlide ? 'opacity-100' : 'opacity-0'}`;
+                if (dot) dot.className = `w-3 h-3 rounded-full ${i === currentSlide ? 'bg-emerald-400' : 'bg-gray-500/60'}`;
+            });
+        }
+
+        function nextSlide() { showSlide(currentSlide + 1); resetAutoSlide(); }
+        function prevSlide() { showSlide(currentSlide - 1); resetAutoSlide(); }
+        function goToSlide(i) { showSlide(i); resetAutoSlide(); }
+        function startAutoSlide() { clearInterval(slideInterval); slideInterval = setInterval(() => showSlide(currentSlide + 1), 4000); }
+        function resetAutoSlide() { clearInterval(slideInterval); startAutoSlide(); }
+
+        function renderApps(apps) {
+            const grid = document.getElementById('appGrid'), noApps = document.getElementById('noApps');
+            document.getElementById('appCount').innerText = `${apps.length} টি অ্যাপস`;
+            grid.innerHTML = '';
+            if (apps.length === 0) return noApps.classList.remove('hidden');
+            noApps.classList.add('hidden');
+
+            apps.forEach(app => {
+                const card = document.createElement('div');
+                card.className = "bg-gray-800 rounded-2xl border border-gray-700/60 p-5 flex flex-col justify-between";
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center space-x-4 mb-4">
+                            <img src="${app.icon}" class="w-16 h-16 rounded-2xl object-cover bg-gray-700">
+                            <div class="overflow-hidden">
+                                <h4 class="font-bold text-lg text-white truncate">${app.name}</h4>
+                                <span class="bg-emerald-500/10 text-emerald-400 text-xs px-2 py-0.5 rounded border border-emerald-500/20 mt-1 inline-block">${app.category}</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400 border-t border-gray-700/60 pt-3 mb-4">
+                            <span><i class="fa-solid fa-code-branch mr-1"></i>${app.version}</span>
+                            <span><i class="fa-solid fa-hard-drive mr-1"></i>${app.size || 'N/A'}</span>
+                        </div>
+                    </div>
+                    <button onclick="onDownloadClick('${encodeURIComponent(JSON.stringify(app))}')" class="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-2.5 rounded-xl flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-download"></i><span>ডাউনলোড করুন</span>
+                    </button>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function onDownloadClick(appJson) {
+            selectedApp = JSON.parse(decodeURIComponent(appJson));
+            if (savedAdsScript && savedAdsScript.trim() !== "") {
+                const box = document.getElementById('adDirectCodeBox');
+                box.innerHTML = '';
+                box.appendChild(document.createRange().createContextualFragment(savedAdsScript));
+
+                document.getElementById('adTimerBadge').classList.remove('hidden');
+                document.getElementById('skipAdBtn').classList.add('hidden');
+                document.getElementById('fullScreenAdsModal').classList.remove('hidden');
+
+                let timeLeft = adDuration;
+                document.getElementById('adCountdown').innerText = timeLeft;
+
+                clearInterval(adTimer);
+                adTimer = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById('adCountdown').innerText = timeLeft;
+                    if (timeLeft <= 0) {
+                        clearInterval(adTimer);
+                        document.getElementById('adTimerBadge').classList.add('hidden');
+                        document.getElementById('skipAdBtn').classList.remove('hidden');
+                    }
+                }, 1000);
+            } else {
+                showDownloadPopup();
+            }
+        }
+
+        function closeAdAndOpenDownloadPopup() {
+            clearInterval(adTimer);
+            document.getElementById('fullScreenAdsModal').classList.add('hidden');
+            showDownloadPopup();
+        }
+
+        function showDownloadPopup() {
+            if (!selectedApp) return;
+            document.getElementById('modalIcon').src = selectedApp.icon;
+            document.getElementById('modalTitle').innerText = selectedApp.name;
+            document.getElementById('modalCategory').innerText = selectedApp.category;
+            document.getElementById('modalVersion').innerHTML = `<i class="fa-solid fa-code-branch mr-1"></i>${selectedApp.version}`;
+            document.getElementById('modalSize').innerHTML = `<i class="fa-solid fa-hard-drive mr-1"></i>${selectedApp.size}`;
+
+            const manualBtn = document.getElementById('manualDownloadBtn');
+            manualBtn.href = selectedApp.link;
+            manualBtn.setAttribute("download", `${selectedApp.name}.apk`);
+
+            document.getElementById('downloadModal').classList.remove('hidden');
+
+            const link = document.createElement('a');
+            link.href = selectedApp.link;
+            link.setAttribute('download', `${selectedApp.name}.apk`);
+            link.target = "_blank";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function closeModal() { document.getElementById('downloadModal').classList.add('hidden'); }
+        function searchApps() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            renderApps(allApps.filter(a => a.name.toLowerCase().includes(q) || a.category.toLowerCase().includes(q)));
+        }
+
+        document.addEventListener('DOMContentLoaded', listenFirebaseData);
+    </script>
+</body>
+  </html>
+  
